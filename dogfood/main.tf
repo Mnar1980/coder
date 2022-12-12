@@ -40,6 +40,9 @@ resource "coder_agent" "dev" {
     code-server --auth none --port 13337 &
     sudo service docker start
     coder dotfiles -y 2>&1 | tee  ~/.personalize.log
+
+    # Install Nix into our bash profile so `nix-shell`, `nix-build, and `nix` are available
+    echo '. /home/coder/.nix-profile/etc/profile.d/nix.sh' >> /home/coder/.bashrc
     EOF
 }
 
@@ -60,6 +63,33 @@ resource "coder_app" "code-server" {
 }
 
 resource "docker_volume" "home_volume" {
+  name = "coder-${data.coder_workspace.me.id}-home"
+  # Protect the volume from being deleted due to changes in attributes.
+  lifecycle {
+    ignore_changes = all
+  }
+  # Add labels in Docker to keep track of orphan resources.
+  labels {
+    label = "coder.owner"
+    value = data.coder_workspace.me.owner
+  }
+  labels {
+    label = "coder.owner_id"
+    value = data.coder_workspace.me.owner_id
+  }
+  labels {
+    label = "coder.workspace_id"
+    value = data.coder_workspace.me.id
+  }
+  # This field becomes outdated if the workspace is renamed but can
+  # be useful for debugging or cleaning out dangling volumes.
+  labels {
+    label = "coder.workspace_name_at_creation"
+    value = data.coder_workspace.me.name
+  }
+}
+
+resource "docker_volume" "nix_volume" {
   name = "coder-${data.coder_workspace.me.id}-home"
   # Protect the volume from being deleted due to changes in attributes.
   lifecycle {
@@ -135,6 +165,11 @@ resource "docker_container" "workspace" {
   volumes {
     container_path = "/home/coder/"
     volume_name    = docker_volume.home_volume.name
+    read_only      = false
+  }
+  volumes {
+    container_path = "/nix"
+    volume_name    = docker_volume.nix_volume.name
     read_only      = false
   }
   # Add labels in Docker to keep track of orphan resources.

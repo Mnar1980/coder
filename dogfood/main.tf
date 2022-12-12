@@ -90,7 +90,7 @@ resource "docker_volume" "home_volume" {
 }
 
 resource "docker_volume" "nix_volume" {
-  name = "coder-${data.coder_workspace.me.id}-home"
+  name = "coder-${data.coder_workspace.me.id}-nix"
   # Protect the volume from being deleted due to changes in attributes.
   lifecycle {
     ignore_changes = all
